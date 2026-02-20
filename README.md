@@ -28,7 +28,7 @@ Opting for Rust was strategic to ensure robustness and performance in a resource
 The service runs in a Docker container within the same internal network as Laravel (`coolify`), without public exposure.
 
 ```mermaid
-graph LR
+graph TD
     Laravel[Laravel App] -- HTTP POST /convert --> ImgOpt[imgopt (Rust)]
     ImgOpt -- WebP/AVIF Bytes --> Laravel
     Laravel -- Saves to S3/Disk --> Storage
@@ -47,7 +47,7 @@ graph LR
     - `image` (decode/operations)
     - `webp` (libwebp bindings)
     - `ravif` + `rav1e` (high-efficiency AVIF encoding)
-- **Memory Allocator**: `jemallocator` (Optimized to avoid fragmentation on Linux)
+- **Memory Allocator**: `jemallocator` (optimized to avoid fragmentation on Linux)
 
 ## API Reference
 
