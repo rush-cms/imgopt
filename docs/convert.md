@@ -33,7 +33,6 @@ Authorization: Bearer <token>
 | `quality` | number | no | `80` | `1–100` | Encoder quality. Lower = smaller file, higher = better quality. |
 | `width` | integer | no | — | `1–4096` | Target width in pixels. Aspect ratio is preserved if `height` is omitted. |
 | `height` | integer | no | — | `1–4096` | Target height in pixels. Aspect ratio is preserved if `width` is omitted. |
-| `strip` | boolean | no | `true` | `true`, `false` | Strip image metadata (EXIF, ICC profile). Currently accepted but not yet applied. |
 
 **Resize behaviour:**
 

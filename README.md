@@ -35,7 +35,7 @@ graph TD
 ```
 
 - **Input**: Multipart form data (file + parameters)
-- **Processing**: Decode -> Resize (optional) -> Strip Metadata -> Encode (WebP/AVIF)
+- **Processing**: Decode -> Resize (optional) -> Encode (WebP/AVIF)
 - **Output**: Processed image bytes (stateless)
 
 ## Tech Stack
@@ -63,15 +63,14 @@ Converts an uploaded image.
 - `file`: Image file (required)
 - `format`: `webp` (default) or `avif`
 - `quality`: 1-100 (default: 80)
-- `width`: Target width (maintains aspect ratio)
-- `height`: Target height
-- `fit`: `cover`, `contain` (default: `cover`)
+- `width`: Target width (maintains aspect ratio if `height` is omitted)
+- `height`: Target height (maintains aspect ratio if `width` is omitted)
 
 ### `GET /health`
 
 Returns service status.
 ```json
-{ "status": "ok", "version": "0.1.0" }
+{ "status": "ok", "version": "0.1.0", "uptime_seconds": 42 }
 ```
 
 ## Development and Testing
