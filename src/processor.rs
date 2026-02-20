@@ -1,4 +1,4 @@
-use image::io::Reader as ImageReader;
+use image::ImageReader;
 use imgref::Img;
 use rgb::FromSlice;
 use std::io::Cursor;
@@ -18,7 +18,6 @@ pub struct ProcessOptions {
     pub quality: f32,
     pub width: Option<u32>,
     pub height: Option<u32>,
-    pub _strip_metadata: bool,
     pub format: OutputFormat,
 }
 
@@ -137,7 +136,7 @@ mod tests {
             *pixel = Rgba([255, 0, 0, 255]);
         }
         let mut bytes = Vec::new();
-        img.write_to(&mut Cursor::new(&mut bytes), image::ImageOutputFormat::Png)
+        img.write_to(&mut Cursor::new(&mut bytes), image::ImageFormat::Png)
             .unwrap();
         bytes
     }
@@ -149,7 +148,6 @@ mod tests {
             quality: 80.0,
             width: None,
             height: None,
-            _strip_metadata: true,
             format: OutputFormat::WebP,
         };
         let result = process_image(&input, options).unwrap();
@@ -165,7 +163,6 @@ mod tests {
             quality: 80.0,
             width: None,
             height: None,
-            _strip_metadata: true,
             format: OutputFormat::Avif,
         };
         let result = process_image(&input, options).unwrap();
@@ -181,7 +178,6 @@ mod tests {
             quality: 80.0,
             width: Some(50),
             height: Some(50),
-            _strip_metadata: true,
             format: OutputFormat::WebP,
         };
         let result = process_image(&input, options).unwrap();
@@ -201,7 +197,6 @@ mod tests {
             quality: 80.0,
             width: Some(MAX_DIMENSION + 1),
             height: None,
-            _strip_metadata: false,
             format: OutputFormat::WebP,
         };
         let result = process_image(&input, options);
@@ -216,7 +211,6 @@ mod tests {
             quality: 150.0,
             width: None,
             height: None,
-            _strip_metadata: false,
             format: OutputFormat::WebP,
         };
         let result = process_image(&input, options);
