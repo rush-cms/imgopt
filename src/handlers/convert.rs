@@ -19,10 +19,18 @@ pub async fn convert_image(mut multipart: Multipart) -> Response {
     let mut quality = 80.0f32;
     let mut width: Option<u32> = None;
     let mut height: Option<u32> = None;
-    let mut strip = true;
     let mut format = OutputFormat::WebP;
 
-    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+    loop {
+        let field = match multipart.next_field().await {
+            Ok(Some(f)) => f,
+            Ok(None) => break,
+            Err(e) => {
+                tracing::warn!(%request_id, error = %e, "Multipart parsing error");
+                return (StatusCode::BAD_REQUEST, "Invalid multipart request").into_response();
+            }
+        };
+
         let name = field.name().unwrap_or("").to_string();
 
         match name.as_str() {
@@ -93,16 +101,15 @@ pub async fn convert_image(mut multipart: Multipart) -> Response {
                     }
                 }
             }
-            "strip" => {
-                if let Ok(val) = field.text().await {
-                    strip = val.parse::<bool>().unwrap_or(true);
-                }
-            }
             "format" => {
                 if let Ok(val) = field.text().await {
                     match val.to_lowercase().as_str() {
+                        "webp" => format = OutputFormat::WebP,
                         "avif" => format = OutputFormat::Avif,
-                        _ => format = OutputFormat::WebP,
+                        _ => {
+                            return (StatusCode::BAD_REQUEST, "format must be 'webp' or 'avif'")
+                                .into_response()
+                        }
                     }
                 }
             }
@@ -129,7 +136,6 @@ pub async fn convert_image(mut multipart: Multipart) -> Response {
         quality,
         width,
         height,
-        _strip_metadata: strip,
         format,
     };
     let format_copy = format;
