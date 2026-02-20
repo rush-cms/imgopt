@@ -1,14 +1,14 @@
 use axum::{
     body::Body,
     http::{Request, Response, StatusCode},
-
     response::IntoResponse,
 };
 use std::env;
-use tower::{Layer, Service};
-use std::task::{Context, Poll};
 use std::future::Future;
 use std::pin::Pin;
+use std::task::{Context, Poll};
+use subtle::ConstantTimeEq;
+use tower::{Layer, Service};
 
 #[derive(Clone)]
 pub struct AuthLayer;
@@ -40,8 +40,9 @@ where
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        // Skip auth for health check
-        if req.uri().path() == "/health" {
+        // Skip auth for health/ready probes
+        let path = req.uri().path();
+        if path == "/health" || path == "/ready" {
             let fut = self.inner.call(req);
             return Box::pin(async move {
                 let res = fut.await?;
@@ -49,25 +50,41 @@ where
             });
         }
 
-        let token = env::var("API_TOKEN").unwrap_or_default();
+        // SEC-001: reject if API_TOKEN is not configured or is empty
+        let token = match env::var("API_TOKEN") {
+            Ok(t) if !t.is_empty() => t,
+            _ => {
+                tracing::error!("API_TOKEN is not configured or is empty");
+                return Box::pin(async move {
+                    Ok((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Server configuration error",
+                    )
+                        .into_response())
+                });
+            }
+        };
+
         let auth_header = req.headers().get("Authorization");
 
-        match auth_header {
+        let authorized = match auth_header {
             Some(header) => {
                 let header_str = header.to_str().unwrap_or("");
-                if header_str == format!("Bearer {}", token) {
-                    let fut = self.inner.call(req);
-                    return Box::pin(async move {
-                        let res = fut.await?;
-                        Ok(res)
-                    });
-                }
+                let expected = format!("Bearer {}", token);
+                // SEC-004: constant-time comparison to prevent timing attacks
+                expected.as_bytes().ct_eq(header_str.as_bytes()).into()
             }
-            None => {}
-        }
+            None => false,
+        };
 
-        Box::pin(async move {
-            Ok((StatusCode::UNAUTHORIZED, "Unauthorized").into_response())
-        })
+        if authorized {
+            let fut = self.inner.call(req);
+            Box::pin(async move {
+                let res = fut.await?;
+                Ok(res)
+            })
+        } else {
+            Box::pin(async move { Ok((StatusCode::UNAUTHORIZED, "Unauthorized").into_response()) })
+        }
     }
 }
