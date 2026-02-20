@@ -18,12 +18,16 @@ pub fn create_router() -> Router {
 
     let max_bytes = max_upload_mb * 1024 * 1024;
 
+    // Read API_TOKEN once here at router-construction time (startup), not per request.
+    // main() already validated that the token is set and non-empty before reaching this point.
+    let api_token = env::var("API_TOKEN").unwrap_or_default();
+
     Router::new()
         .route("/health", get(handlers::health::health_check))
         .route("/ready", get(handlers::health::ready_check))
         .route("/convert", post(handlers::convert::convert_image))
         // Layer execution order (outermost first): TraceLayer → BodyLimit → Auth → Handler
-        .layer(middleware::auth::AuthLayer)
+        .layer(middleware::auth::AuthLayer::new(api_token))
         .layer(RequestBodyLimitLayer::new(max_bytes as usize))
         .layer(TraceLayer::new_for_http())
 }

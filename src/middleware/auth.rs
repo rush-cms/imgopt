@@ -3,7 +3,6 @@ use axum::{
     http::{Request, Response, StatusCode},
     response::IntoResponse,
 };
-use std::env;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -11,19 +10,35 @@ use subtle::ConstantTimeEq;
 use tower::{Layer, Service};
 
 #[derive(Clone)]
-pub struct AuthLayer;
+pub struct AuthLayer {
+    // Pre-formatted expected Authorization header value ("Bearer <token>"),
+    // built once at startup to avoid per-request allocations and env reads.
+    expected: String,
+}
+
+impl AuthLayer {
+    pub fn new(token: String) -> Self {
+        Self {
+            expected: format!("Bearer {}", token),
+        }
+    }
+}
 
 impl<S> Layer<S> for AuthLayer {
     type Service = AuthService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        AuthService { inner }
+        AuthService {
+            inner,
+            expected: self.expected.clone(),
+        }
     }
 }
 
 #[derive(Clone)]
 pub struct AuthService<S> {
     inner: S,
+    expected: String,
 }
 
 impl<S> Service<Request<Body>> for AuthService<S>
@@ -50,29 +65,13 @@ where
             });
         }
 
-        // SEC-001: reject if API_TOKEN is not configured or is empty
-        let token = match env::var("API_TOKEN") {
-            Ok(t) if !t.is_empty() => t,
-            _ => {
-                tracing::error!("API_TOKEN is not configured or is empty");
-                return Box::pin(async move {
-                    Ok((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "Server configuration error",
-                    )
-                        .into_response())
-                });
-            }
-        };
-
         let auth_header = req.headers().get("Authorization");
 
         let authorized = match auth_header {
             Some(header) => {
                 let header_str = header.to_str().unwrap_or("");
-                let expected = format!("Bearer {}", token);
                 // SEC-004: constant-time comparison to prevent timing attacks
-                expected.as_bytes().ct_eq(header_str.as_bytes()).into()
+                self.expected.as_bytes().ct_eq(header_str.as_bytes()).into()
             }
             None => false,
         };
