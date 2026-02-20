@@ -1,4 +1,4 @@
-use axum::{response::Json, http::StatusCode};
+use axum::{http::StatusCode, response::Json};
 use serde::Serialize;
 use std::time::SystemTime;
 
@@ -7,6 +7,11 @@ pub struct HealthResponse {
     status: String,
     version: String,
     uptime_seconds: u64,
+}
+
+#[derive(Serialize)]
+pub struct ReadyResponse {
+    ready: bool,
 }
 
 static START_TIME: std::sync::OnceLock<SystemTime> = std::sync::OnceLock::new();
@@ -25,4 +30,8 @@ pub async fn health_check() -> (StatusCode, Json<HealthResponse>) {
     };
 
     (StatusCode::OK, Json(response))
+}
+
+pub async fn ready_check() -> (StatusCode, Json<ReadyResponse>) {
+    (StatusCode::OK, Json(ReadyResponse { ready: true }))
 }

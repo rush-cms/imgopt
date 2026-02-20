@@ -3,7 +3,6 @@ use axum::{
     Router,
 };
 use std::env;
-
 use tokio::net::TcpListener;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::trace::TraceLayer;
@@ -21,14 +20,52 @@ pub fn create_router() -> Router {
 
     Router::new()
         .route("/health", get(handlers::health::health_check))
+        .route("/ready", get(handlers::health::ready_check))
         .route("/convert", post(handlers::convert::convert_image))
-        .layer(middleware::auth::AuthLayer) // Custom auth middleware
+        // Layer execution order (outermost first): TraceLayer → BodyLimit → Auth → Handler
+        .layer(middleware::auth::AuthLayer)
         .layer(RequestBodyLimitLayer::new(max_bytes as usize))
         .layer(TraceLayer::new_for_http())
 }
 
-pub async fn start(addr: &str) {
+pub async fn start(addr: &str) -> anyhow::Result<()> {
     let app = create_router();
-    let listener = TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = TcpListener::bind(addr)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to bind to {}: {}", addr, e))?;
+
+    let shutdown_signal = make_shutdown_signal();
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal)
+        .await
+        .map_err(|e| anyhow::anyhow!("Server error: {}", e))
+}
+
+async fn make_shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to install CTRL+C handler");
+    };
+
+    #[cfg(unix)]
+    {
+        let terminate = async {
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .expect("Failed to install SIGTERM handler")
+                .recv()
+                .await;
+        };
+        tokio::select! {
+            _ = ctrl_c => tracing::info!("Received SIGINT, shutting down gracefully"),
+            _ = terminate => tracing::info!("Received SIGTERM, shutting down gracefully"),
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        ctrl_c.await;
+        tracing::info!("Received CTRL+C, shutting down gracefully");
+    }
 }
