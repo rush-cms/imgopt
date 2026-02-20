@@ -14,12 +14,20 @@ RUN cargo build --release
 
 FROM debian:bookworm-slim
 
-RUN apt-get update && apt-get install -y ca-certificates libwebp7 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates libwebp7 curl && rm -rf /var/lib/apt/lists/*
+
+# Run as non-root user
+RUN groupadd -r imgopt && useradd -r -g imgopt imgopt
 
 WORKDIR /app
 COPY --from=builder /app/target/release/imgopt /usr/local/bin/imgopt
 
+USER imgopt
+
 ENV PORT=3000
 EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD curl -fsS "http://localhost:${PORT:-3000}/health" > /dev/null || exit 1
 
 CMD ["imgopt"]
