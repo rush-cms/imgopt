@@ -29,9 +29,9 @@ The service runs in a Docker container within the same internal network as Larav
 
 ```mermaid
 graph TD
-    Laravel[Laravel App] -- HTTP POST /convert --> ImgOpt[imgopt (Rust)]
-    ImgOpt -- WebP/AVIF Bytes --> Laravel
-    Laravel -- Saves to S3/Disk --> Storage
+    Laravel[Laravel App] -- "HTTP POST /convert" --> ImgOpt["imgopt (Rust)"]
+    ImgOpt -- "WebP/AVIF bytes" --> Laravel
+    Laravel -- "Saves to S3/Disk" --> Storage
 ```
 
 - **Input**: Multipart form data (file + parameters)
